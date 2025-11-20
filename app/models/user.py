@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
-from app.auth.auth_handler import get_password_hash, verify_password
 
 class User(Base):
     __tablename__ = "users"
@@ -10,10 +9,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True, comment='Уникальный идентификатор пользователя')  
 
     # Имя пользователя
-    first_name = Column(String(50, nullable=False), comment='Имя пользователя') 
+    first_name = Column(String(50), nullable=False, comment='Имя пользователя') 
 
     # Фамилия пользователя
-    last_name = Column(String(50, nullable=False),comment='Фамилия пользователя')   
+    last_name = Column(String(50), nullable=False,comment='Фамилия пользователя')   
 
     # Email пользователя
     email = Column(String(100), unique=True, index=True, nullable=False, comment='Email пользователя') 
