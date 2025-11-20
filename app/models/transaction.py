@@ -6,15 +6,8 @@ from app.database import Base
 
 
 class TransactionType(enum.Enum):
-    """
-    Типы финансовых транзакций.
-    
-    Values:
-        INCOME: Доход (деньги поступают)
-        EXPENSE: Расход (деньги уходят)
-    """
-    INCOME = "income"
-    EXPENSE = "expense"
+    INCOME = "income"   # доход
+    EXPENSE = "expense"    # расход
 
 
 class Transaction(Base):
