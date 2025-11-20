@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -46,7 +46,7 @@ class Transaction(Base):
     
     # Сумма транзакции
     amount = Column(
-        Float, 
+        Numeric(precision=10, scale=2), 
         nullable=False,
         comment="Сумма транзакции. Всегда положительное число"
     )
