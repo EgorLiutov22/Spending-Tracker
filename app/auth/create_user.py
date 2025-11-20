@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 
 from app.models.user import User
 from app.schemas.user_create import UserCreate
-from app.services.get_user_by_email import get_user_by_email
+from app.auth.get_user_by_email import get_user_by_email
 
 
 def create_user(db: Session, user_data: UserCreate) -> User:

@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.models.user import User
-from app.services.get_user_by_email import get_user_by_email
+from app.auth.get_user_by_email import get_user_by_email
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
