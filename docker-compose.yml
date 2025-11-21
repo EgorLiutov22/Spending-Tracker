@@ -1,18 +1,14 @@
-version: '3.8'
-
 services:
   spending_tracker_postgresql:
     image: postgres:15
-    environment:
-      - POSTGRES_NAME=spending_tracker
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=Passw0rd
     ports:
       - "45432:5432"
     networks:
       - spending_tracker_net
     volumes:
       - pgdata:/var/lib/postgresql/data
+    env_file:
+      - .env.db
 
   spending_tracker_api:
     build:
