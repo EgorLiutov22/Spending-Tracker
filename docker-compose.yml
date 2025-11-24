@@ -1,0 +1,32 @@
+services:
+  spending_tracker_postgresql:
+    image: postgres:15
+    ports:
+      - "45432:5432"
+    networks:
+      - spending_tracker_net
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    env_file:
+      - .env.db
+
+  spending_tracker_api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    depends_on:
+      - spending_tracker_postgresql
+    ports:
+      - "10000:8080"
+    networks:
+      - spending_tracker_net
+    env_file:
+      - .env.api
+
+volumes:
+  pgdata:
+
+networks:
+  spending_tracker_net:
+    name: spending_tracker
+    driver: bridge
