@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.user import User
 from app.crud.crud_user import user_crud
 from app.schemas.token import TokenPayload
+from app.core.database import get_db
 
 
 class AuthService:
