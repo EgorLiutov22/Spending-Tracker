@@ -6,10 +6,12 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.config import settings
 from app.models.user import User
 from app.crud.crud_user import user_crud
 from app.schemas.token import TokenPayload
+
 
 
 class AuthService:
