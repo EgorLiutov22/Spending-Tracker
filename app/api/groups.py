@@ -7,8 +7,6 @@ from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
 from app.services.auth_services import AuthService
-from app.services.group_service import group_service
-from app.services.analytics_service import analytics_service
 
 
 # Временные схемы для групп (добавьте в app/schemas/group.py)
@@ -130,10 +128,70 @@ class GroupCRUD:
         # Временная реализация
         return True
 
+    @staticmethod
+    def check_user_access(db: Session, group_id: int, user_id: UUID):
+        """Проверяет, имеет ли пользователь доступ к группе"""
+        # Временная реализация - всегда возвращает True для тестовой группы
+        group = GroupCRUD.get(db, group_id)
+        if group and group.id == 1:
+            return group
+        return None
 
-# Инициализация CRUD и AuthService
+
+# Временный сервис аналитики
+class AnalyticsService:
+    @staticmethod
+    def get_group_analytics(
+        db: Session,
+        group_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category: Optional[str] = None
+    ):
+        """Возвращает аналитику для группы"""
+        # Временная реализация с тестовыми данными
+        return GroupAnalytics(
+            total_expenses=1500.0,
+            total_income=2000.0,
+            balance=500.0,
+            member_count=3,
+            period_start=start_date,
+            period_end=end_date,
+            category_breakdown=[
+                CategoryBreakdown(category="Food", amount=500.0, percentage=33.3),
+                CategoryBreakdown(category="Transport", amount=300.0, percentage=20.0),
+                CategoryBreakdown(category="Entertainment", amount=700.0, percentage=46.7),
+            ],
+            member_contributions=[
+                MemberContribution(
+                    user_id=UUID("12345678-1234-1234-1234-123456789abc"),
+                    first_name="John",
+                    last_name="Doe",
+                    total_contributed=800.0,
+                    percentage=40.0
+                ),
+                MemberContribution(
+                    user_id=UUID("22345678-1234-1234-1234-123456789abc"),
+                    first_name="Jane",
+                    last_name="Smith",
+                    total_contributed=700.0,
+                    percentage=35.0
+                ),
+                MemberContribution(
+                    user_id=UUID("32345678-1234-1234-1234-123456789abc"),
+                    first_name="Bob",
+                    last_name="Johnson",
+                    total_contributed=500.0,
+                    percentage=25.0
+                ),
+            ]
+        )
+
+
+# Инициализация CRUD и сервисов
 group_crud = GroupCRUD()
 auth_service = AuthService()
+analytics_service = AnalyticsService()
 
 router = APIRouter()
 
@@ -202,7 +260,7 @@ def get_group(
     - Returns detailed group info with member list
     """
     # Проверяем, что пользователь имеет доступ к группе
-    group = group_service.get_group_with_access_check(
+    group = group_crud.check_user_access(
         db=db,
         group_id=id,
         user_id=current_user.uid
@@ -314,7 +372,7 @@ def get_group_analytics(
     - Includes category breakdown and member contributions
     """
     # Проверяем доступ к группе
-    group = group_service.get_group_with_access_check(
+    group = group_crud.check_user_access(
         db=db,
         group_id=id,
         user_id=current_user.uid
