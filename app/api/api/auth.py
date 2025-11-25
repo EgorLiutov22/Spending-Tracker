@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db
-from app.services.auth_service import auth_service, get_current_user
-from app.crud.crud_user import user_crud
-from app.schemas.token import Token, RefreshToken
-from app.schemas.user import UserCreate, UserResponse
+from app.database import get_db
+from app.services.auth_services import auth_service
+from app.schemas.token_schema import Token
+from app.schemas.user_schema import UserResponse
+from app.schemas.user_create import UserCreate
 from app.models.user import User
 
 router = APIRouter()
@@ -22,7 +22,7 @@ def register(
     Register a new user
     """
     # Check if user already exists
-    existing_user = user_crud.get_by_email(db, email=user_in.email)
+    existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -30,7 +30,24 @@ def register(
         )
 
     # Create new user
-    user = user_crud.create_with_password(db, obj_in=user_in)
+    from app.services.auth_services import auth_service
+
+    # Хэшируем пароль
+    hashed_password = auth_service.pwd_context.hash(user_in.password)
+
+    # Создаем пользователя
+    user = User(
+        first_name=user_in.first_name,
+        last_name=user_in.last_name,
+        email=user_in.email,
+        hashed_password=hashed_password,
+        is_active=True
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
     return user
 
 
@@ -42,10 +59,10 @@ def login(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    user = auth_service.authenticate_user(
-        db, email=form_data.username, password=form_data.password
-    )
-    if not user:
+    # Аутентификация пользователя
+    user = db.query(User).filter(User.email == form_data.username).first()
+
+    if not user or not auth_service.pwd_context.verify(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -57,18 +74,24 @@ def login(
             detail="Inactive user"
         )
 
-    return auth_service.create_tokens(user)
+    # Создаем токены
+    access_token = auth_service.create_access_token(data={"sub": user.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 @router.post("/refresh-token", response_model=Token)
 def refresh_token(
-        token_in: RefreshToken,
+        refresh_token: str,
         db: Session = Depends(get_db)
 ):
     """
     Refresh access token
     """
-    payload = auth_service.verify_token(token_in.refresh_token)
+    payload = auth_service.verify_token(refresh_token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,41 +107,48 @@ def refresh_token(
             detail="Invalid refresh token"
         )
 
-    user = user_crud.get_by_email(db, email=email)
+    user = db.query(User).filter(User.email == email).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
 
-    return auth_service.create_tokens(user)
+    # Создаем новый access token
+    access_token = auth_service.create_access_token(data={"sub": user.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 @router.post("/change-password")
 def change_password(
         current_password: str,
         new_password: str,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(auth_service.get_current_user),
         db: Session = Depends(get_db)
 ):
     """
     Change user password
     """
     # Verify current password
-    if not auth_service.verify_password(current_password, current_user.hashed_password):
+    if not auth_service.pwd_context.verify(current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
 
     # Update password
-    user_crud.update_password(db, user_id=current_user.id, new_password=new_password)
+    current_user.hashed_password = auth_service.pwd_context.hash(new_password)
+    db.commit()
 
     return {"message": "Password changed successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(auth_service.get_current_user)):
     """
     Get current user information
     """

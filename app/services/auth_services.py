@@ -6,19 +6,22 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.core.config import settings
+from app.database import get_db
 from app.models.user import User
-from app.crud.crud_user import user_crud
-from app.schemas.token import TokenPayload
 
+# Константы для JWT
+SECRET_KEY = "your-secret-key-change-in-production"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 class AuthService:
     def __init__(self):
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         self.security = HTTPBearer()
-
+        self.secret_key = SECRET_KEY
+        self.algorithm = ALGORITHM
+        self.access_token_expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
 
     def create_access_token(self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
         """
@@ -37,7 +40,7 @@ class AuthService:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(
-                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+                minutes=self.access_token_expire_minutes
             )
 
         to_encode.update({
@@ -48,14 +51,24 @@ class AuthService:
 
         encoded_jwt = jwt.encode(
             to_encode,
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM
+            self.secret_key,
+            algorithm=self.algorithm
         )
         return encoded_jwt
 
-
-
-
+    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Verify JWT token and return payload
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm]
+            )
+            return payload
+        except JWTError:
+            return None
 
     async def get_current_user(
             self,
@@ -93,7 +106,7 @@ class AuthService:
         if email is None or token_type != "access":
             raise credentials_exception
 
-        user = user_crud.get_by_email(db, email=email)
+        user = db.query(User).filter(User.email == email).first()
         if user is None:
             raise credentials_exception
 
@@ -104,3 +117,7 @@ class AuthService:
             )
 
         return user
+
+
+# Глобальный экземпляр
+auth_service = AuthService()

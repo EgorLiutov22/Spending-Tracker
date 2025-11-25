@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.orm import relationship
-from database import Base
+from app.database import Base
+
 
 # Таблица для связи многие-ко-многим между пользователями и группами, 1 пользлователь может быть в нескольких группах
 user_group_association = Table(
