@@ -13,6 +13,7 @@ from app.models.category import Category  # Предполагаем, что е�
 # Схемы Pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+router = APIRouter()
 
 class TransactionTypeEnum(str, enum.Enum):
     INCOME = "income"
@@ -48,7 +49,7 @@ class CategoryResponse(BaseModel):
 
 class TransactionResponse(TransactionBase):
     id: int
-    user_id: int
+    user_id: intЦ
     category: CategoryResponse
 
     model_config = ConfigDict(from_attributes=True)

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from app.database import get_db
 from app.services.auth_services import AuthService
 
+router = APIRouter()
 
 # Временные схемы для групп (добавьте в app/schemas/group.py)
 class GroupBase(BaseModel):
