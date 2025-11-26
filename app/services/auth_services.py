@@ -119,5 +119,4 @@ class AuthService:
         return user
 
 
-# Глобальный экземпляр
 auth_service = AuthService()
