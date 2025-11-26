@@ -5,3 +5,5 @@ python-dotenv
 alembic
 aiosqlite
 asyncpg
+pandas
+openpyxl
