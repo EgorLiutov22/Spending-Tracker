@@ -1,8 +1,8 @@
 from uuid import UUID
-from pydantic import EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
-class UserResponse:
+class UserResponse(BaseModel):
     uid: UUID
     email: EmailStr
     status: bool
