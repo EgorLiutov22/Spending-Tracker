@@ -31,7 +31,7 @@ FastAPI приложение для управления личными фина
 git clone https://github.com/EgorLiutov22/Spending-Tracker
 cd spending_tracker
 #docker-compose up --build
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 
 Приложение будет доступно по адресам:
 
