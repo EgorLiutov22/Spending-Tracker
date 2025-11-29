@@ -7,3 +7,4 @@ aiosqlite
 asyncpg
 pandas
 openpyxl
+python-dotenv
