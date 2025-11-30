@@ -1,4 +1,4 @@
-from datetime import date as DateType
+from datetime import date
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -19,7 +19,7 @@ class CategorySummary(BaseModel):
 
 
 class DailySummary(BaseModel):
-    date: DateType
+    date: date
     income: float
     expense: float
     balance: float
@@ -30,4 +30,4 @@ class ExportParams(BaseModel):
     end_date: Optional[date] = None
     category_id: Optional[int] = None
     group_id: Optional[int] = None
-    format: str = "csv"  # "csv" or "xlsx"
+    format: str = "csv"  # "csv" или "xlsx"
