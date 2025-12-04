@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -26,7 +27,20 @@ class User(Base):
     # Дата создания
     created_at = Column(DateTime(timezone=True), server_default=func.now(), 
                         comment='Дата и время создания пользователя')
-    
+    transactions = relationship("Transaction", back_populates="user")
+    categories = relationship("Category", back_populates="user")
+
+    groups = relationship(
+        "Group", 
+        secondary="user_group_association",  # Используем строку для избежания циклического импорта
+        back_populates="members"
+    )
+    owned_groups = relationship(
+        "Group", 
+        back_populates="owner", 
+        foreign_keys="Group.owner_id"  # Указываем foreign_keys строкой
+    )
+       
     def __repr__(self) -> str:
         """
         Строковое представление пользователя.
