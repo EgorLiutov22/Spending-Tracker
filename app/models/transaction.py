@@ -39,7 +39,7 @@ class Transaction(Base):
     # Связь с категорией 
     category_id = Column(
         Integer, 
-        ForeignKey("categories.id"),  # предполагаем что таблица называется categories
+        ForeignKey("categories.id", ondelete='CASCADE'),  # предполагаем что таблица называется categories
         nullable=False,
         comment="ID категории транзакции. Внешний ключ к таблице categories."
     )
@@ -61,13 +61,21 @@ class Transaction(Base):
     # Связь с пользователем
     user_id = Column(
         Integer, 
-        ForeignKey("users.id"), 
+        ForeignKey("users.id", ondelete='CASCADE'), 
         nullable=False,
         comment="ID пользователя, которому принадлежит транзакция"
     )
-    
+
+  # Связь с группой 
+    group_id = Column(
+        Integer, 
+        ForeignKey("groups.id", ondelete='CASCADE'),  # ondelete='CASCADE' или 'SET NULL'
+        nullable=True,  # Транзакция может не принадлежать ни к какой группе
+        comment="ID группы, к которой относится транзакция. Может быть NULL."
+    )
+
     # Отношение с категорией 
-    category = relationship("Category", back_populates="transactions")
+    category = relationship("Category", bacstatusk_populates="transactions")
     
     # Отношение с пользователем
     user = relationship("User", back_populates="transactions")
@@ -76,7 +84,7 @@ class Transaction(Base):
         """
         Строковое представление транзакции.
         """
-        return f"<Transaction(id={self.id}, name='{self.name}', amount={self.amount}, type='{self.type.value}')>"
+        return f"<Transaction(id={self.id}, name='{self.name}', amount={self.amount}, type='{self.type.value}, group_id={self.group_id})>"
     
     def to_dict(self) -> dict:
         """
@@ -88,7 +96,9 @@ class Transaction(Base):
             'type': self.type.value,
             'category_id': self.category_id,
             'category_name': self.category.name if self.category else None,  # включаем имя категории
-            'amount': self.amount,
+            'amount': float(self.amount) if self.amount else None,
             'date': self.date.isoformat() if self.date else None,
-            'user_id': self.user_id
+            'user_id': self.user_id,
+            'group_id': self.group_id,
+            'group_name': self.group.name if self.group else None  # Добавляем имя группы
         }

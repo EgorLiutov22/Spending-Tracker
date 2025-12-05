@@ -7,7 +7,7 @@ from app.database import Base
 user_group_association = Table(
     'user_group_association',                                                               # Имя таблицы в БД
     Base.metadata,                                                                                # Метаданные SQLAlchemy
-    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
+    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
     Column('group_id', Integer, ForeignKey('groups.id'), primary_key=True)
 )
 
@@ -26,7 +26,7 @@ class Group(Base):
     id = Column(Integer,primary_key=True,index= True)
     name = Column(String(100),nullable=False,index = True)
     description = Column(String,nullable=True)
-    owner_id = Column(Integer,ForeignKey('user.id'),nullable = False)
+    owner_id = Column(Integer,ForeignKey('users.id'),nullable = False)
 
 
     # Связь с пользователями (многие-ко-многим)
