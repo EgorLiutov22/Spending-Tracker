@@ -75,7 +75,7 @@ class Transaction(Base):
     )
 
     # Отношение с категорией 
-    category = relationship("Category", bacstatusk_populates="transactions")
+    category = relationship("Category", back_populates="transactions")
     
     # Отношение с пользователем
     user = relationship("User", back_populates="transactions")

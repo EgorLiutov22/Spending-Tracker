@@ -7,7 +7,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 
-engine = create_async_engine(DATABASE_URL, echo=True) #echo=True удалить в проде
+engine = create_async_engine(DATABASE_URL, echo=True)  # echo=True удалить в проде
 AsyncSessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -15,6 +15,7 @@ AsyncSessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
 
 # Dependency
 async def get_db():
