@@ -13,7 +13,11 @@ from app.models.category import Category  # Предполагаем, что е�
 # Схемы Pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
+
+
+
 router = APIRouter()
+
 
 class TransactionTypeEnum(str, enum.Enum):
     INCOME = "income"
@@ -49,7 +53,7 @@ class CategoryResponse(BaseModel):
 
 class TransactionResponse(TransactionBase):
     id: int
-    user_id: intЦ
+    user_id: int
     category: CategoryResponse
 
     model_config = ConfigDict(from_attributes=True)
@@ -73,7 +77,7 @@ class TransactionCRUD:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category not found"
             )
-        
+
         # Создаем транзакцию
         db_transaction = Transaction(
             name=transaction_in.name,
@@ -83,7 +87,7 @@ class TransactionCRUD:
             date=transaction_in.date or datetime.now(),
             user_id=user_id
         )
-        
+
         db.add(db_transaction)
         db.commit()
         db.refresh(db_transaction)
@@ -91,55 +95,55 @@ class TransactionCRUD:
 
     @staticmethod
     def get_multi_by_user(
-        db: Session, 
-        user_id: int, 
-        skip: int = 0, 
-        limit: int = 100,
-        category_id: Optional[int] = None,
-        type: Optional[TransactionTypeEnum] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+            db: Session,
+            user_id: int,
+            skip: int = 0,
+            limit: int = 100,
+            category_id: Optional[int] = None,
+            type: Optional[TransactionTypeEnum] = None,
+            start_date: Optional[date] = None,
+            end_date: Optional[date] = None
     ):
         query = db.query(Transaction).filter(Transaction.user_id == user_id)
-        
+
         # Применяем фильтры
         if category_id:
             query = query.filter(Transaction.category_id == category_id)
-        
+
         if type:
             query = query.filter(Transaction.type == TransactionType(type.value))
-        
+
         if start_date:
             start_datetime = datetime.combine(start_date, datetime.min.time())
             query = query.filter(Transaction.date >= start_datetime)
-        
+
         if end_date:
             end_datetime = datetime.combine(end_date, datetime.max.time())
             query = query.filter(Transaction.date <= end_datetime)
-        
+
         # Получаем общее количество
         total = query.count()
-        
+
         # Применяем пагинацию и сортировку
-        transactions = query.order_by(Transaction.date.desc(), Transaction.id.desc())\
-                          .offset(skip)\
-                          .limit(limit)\
-                          .all()
-        
+        transactions = query.order_by(Transaction.date.desc(), Transaction.id.desc()) \
+            .offset(skip) \
+            .limit(limit) \
+            .all()
+
         return transactions, total
 
     @staticmethod
     def get(db: Session, transaction_id: int, user_id: int):
-        return db.query(Transaction)\
-                .filter(Transaction.id == transaction_id, Transaction.user_id == user_id)\
-                .first()
+        return db.query(Transaction) \
+            .filter(Transaction.id == transaction_id, Transaction.user_id == user_id) \
+            .first()
 
     @staticmethod
     def update(db: Session, transaction_id: int, transaction_in: TransactionUpdate, user_id: int):
         transaction = TransactionCRUD.get(db, transaction_id, user_id)
         if not transaction:
             return None
-        
+
         # Проверяем категорию, если она обновляется
         if transaction_in.category_id is not None:
             category = db.query(Category).filter(Category.id == transaction_in.category_id).first()
@@ -148,17 +152,17 @@ class TransactionCRUD:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Category not found"
                 )
-        
+
         # Обновляем поля
         update_data = transaction_in.model_dump(exclude_unset=True)
-        
+
         # Конвертируем строковый тип в enum, если нужно
         if 'type' in update_data and update_data['type']:
             update_data['type'] = TransactionType(update_data['type'].value)
-        
+
         for field, value in update_data.items():
             setattr(transaction, field, value)
-        
+
         db.commit()
         db.refresh(transaction)
         return transaction
@@ -168,7 +172,7 @@ class TransactionCRUD:
         transaction = TransactionCRUD.get(db, transaction_id, user_id)
         if not transaction:
             return False
-        
+
         db.delete(transaction)
         db.commit()
         return True
@@ -178,14 +182,14 @@ class TransactionCRUD:
 transaction_crud = TransactionCRUD()
 auth_service = AuthService()
 
-router = APIRouter()
+
 
 
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_transaction(
-    transaction_in: TransactionCreate,
-    current_user: User = Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+        transaction_in: TransactionCreate,
+        current_user: User = Depends(auth_service.get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Create a new transaction
@@ -199,20 +203,20 @@ def create_transaction(
         transaction_in=transaction_in,
         user_id=current_user.id
     )
-    
+
     return transaction
 
 
 @router.get("/", response_model=TransactionListResponse)
 def get_transactions(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
-    category_id: Optional[int] = Query(None, description="Filter by category ID"),
-    type: Optional[TransactionTypeEnum] = Query(None, description="Filter by type (income/expense)"),
-    start_date: Optional[date] = Query(None, description="Start date for filtering (YYYY-MM-DD)"),
-    end_date: Optional[date] = Query(None, description="End date for filtering (YYYY-MM-DD)"),
-    current_user: User = Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+        skip: int = Query(0, ge=0, description="Number of records to skip"),
+        limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+        category_id: Optional[int] = Query(None, description="Filter by category ID"),
+        type: Optional[TransactionTypeEnum] = Query(None, description="Filter by type (income/expense)"),
+        start_date: Optional[date] = Query(None, description="Start date for filtering (YYYY-MM-DD)"),
+        end_date: Optional[date] = Query(None, description="End date for filtering (YYYY-MM-DD)"),
+        current_user: User = Depends(auth_service.get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Get list of transactions with filtering and pagination
@@ -231,7 +235,7 @@ def get_transactions(
         start_date=start_date,
         end_date=end_date
     )
-    
+
     return TransactionListResponse(
         transactions=transactions,
         total=total,
@@ -242,9 +246,9 @@ def get_transactions(
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
 def get_transaction(
-    transaction_id: int,
-    current_user: User = Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+        transaction_id: int,
+        current_user: User = Depends(auth_service.get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Get a single transaction by ID
@@ -256,22 +260,22 @@ def get_transaction(
         transaction_id=transaction_id,
         user_id=current_user.id
     )
-    
+
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found"
         )
-    
+
     return transaction
 
 
 @router.put("/{transaction_id}", response_model=TransactionResponse)
 def update_transaction(
-    transaction_id: int,
-    transaction_in: TransactionUpdate,
-    current_user: User = Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+        transaction_id: int,
+        transaction_in: TransactionUpdate,
+        current_user: User = Depends(auth_service.get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Update a transaction
@@ -285,21 +289,21 @@ def update_transaction(
         transaction_in=transaction_in,
         user_id=current_user.id
     )
-    
+
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found"
         )
-    
+
     return transaction
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
-    transaction_id: int,
-    current_user: User = Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+        transaction_id: int,
+        current_user: User = Depends(auth_service.get_current_user),
+        db: Session = Depends(get_db)
 ):
     """
     Delete a transaction
@@ -311,11 +315,11 @@ def delete_transaction(
         transaction_id=transaction_id,
         user_id=current_user.id
     )
-    
+
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found"
         )
-    
+
     return None
