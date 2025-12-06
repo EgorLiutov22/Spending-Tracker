@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from .database import engine, Base
-from .api.transactions import router as transactions_router
+from .api.transactions import transaction_router as transactions_router
 
 app = FastAPI(title="Spending Tracker API")
 app.include_router(transactions_router)

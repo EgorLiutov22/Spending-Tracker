@@ -4,12 +4,12 @@ from datetime import date
 from uuid import UUID
 
 # Импорты схем проекта
-from app.schemas.schema_User_login import UserLogin
+from app.schemas.user_login_schema import UserLogin
 from app.schemas.analytic_schema import AnalyticsOverview, CategorySummary, DailySummary, ExportParams
 from app.schemas.category_schema import CategoryBase, CategoryCreate, CategoryUpdate
 from app.schemas.token_schema import Token, TokenData
-from app.schemas.user_create import UserCreate
-from app.schemas.user_schema import UserResponse
+from app.schemas.user_create_schema import UserCreate
+from app.schemas.user_response_schema import UserResponse
 
 
 class TestUserLogin:
