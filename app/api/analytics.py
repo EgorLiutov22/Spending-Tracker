@@ -11,10 +11,11 @@ from app.schemas.analytic_schema import AnalyticsOverview, CategorySummary, Dail
 
 from app.utils.export import get_exporter
 
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+analytic_router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
-@router.get("/overview", response_model=AnalyticsOverview)
+@analytic_router.get("/overview", response_model=AnalyticsOverview)
 async def get_overview(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -24,7 +25,7 @@ async def get_overview(
     return await AnalyticsService.get_overview(db, current_user, start_date, end_date)
 
 
-@router.get("/by-category", response_model=List[CategorySummary])
+@analytic_router.get("/by-category", response_model=List[CategorySummary])
 async def get_by_category(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -34,7 +35,7 @@ async def get_by_category(
     return await AnalyticsService.get_by_category(db, current_user, start_date, end_date)
 
 
-@router.get("/by-date", response_model=List[DailySummary])
+@analytic_router.get("/by-date", response_model=List[DailySummary])
 async def get_by_date(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -45,7 +46,7 @@ async def get_by_date(
     return await AnalyticsService.get_by_date(db, current_user, start_date, end_date, group_by)
 
 
-@router.get("/export")
+@analytic_router.get("/export")
 async def export_transactions(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),

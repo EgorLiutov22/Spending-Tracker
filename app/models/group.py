@@ -2,9 +2,9 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from app.database import Base
 
-# Таблица для связи многие-ко-многим между пользователями и группами, 1 пользлователь может быть в нескольких группах
+# Таблица для связи многие-ко-многим между пользователями и группами, 1 пользователь может быть в нескольких группах
 user_group_association = Table(
-    'user_group_association',  # Имя таблицы в БД
+    'user_group_associations',  # Имя таблицы в БД
     Base.metadata,  # Метаданные SQLAlchemy
     Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
     Column('group_id', Integer, ForeignKey('groups.id'), primary_key=True)

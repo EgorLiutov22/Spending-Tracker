@@ -6,9 +6,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
-from app.services.auth_services import AuthService
+from app.services.auth_service import AuthService
 
-router = APIRouter()
+group_router = APIRouter()
 
 # Временные схемы для групп (добавьте в app/schemas/group.py)
 class GroupBase(BaseModel):
@@ -194,10 +194,8 @@ group_crud = GroupCRUD()
 auth_service = AuthService()
 analytics_service = AnalyticsService()
 
-router = APIRouter()
 
-
-@router.post("/", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
+@group_router.post("/", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
 def create_group(
         group_in: GroupCreate,
         current_user=Depends(auth_service.get_current_user),
@@ -228,7 +226,7 @@ def create_group(
     return group
 
 
-@router.get("/", response_model=List[GroupResponse])
+@group_router.get("/", response_model=List[GroupResponse])
 def get_groups(
         skip: int = Query(0, ge=0, description="Number of records to skip"),
         limit: int = Query(100, ge=1, le=100, description="Number of records to return"),
@@ -249,7 +247,7 @@ def get_groups(
     return groups
 
 
-@router.get("/{id}", response_model=GroupWithMembers)
+@group_router.get("/{id}", response_model=GroupWithMembers)
 def get_group(
         id: int,
         current_user=Depends(auth_service.get_current_user),
@@ -292,7 +290,7 @@ def get_group(
     return group_with_members
 
 
-@router.put("/{id}", response_model=GroupResponse)
+@group_router.put("/{id}", response_model=GroupResponse)
 def update_group(
         id: int,
         group_in: GroupUpdate,
@@ -323,7 +321,7 @@ def update_group(
     return updated_group
 
 
-@router.delete("/{id}")
+@group_router.delete("/{id}")
 def delete_group(
         id: int,
         current_user=Depends(auth_service.get_current_user),
@@ -357,7 +355,7 @@ def delete_group(
     }
 
 
-@router.get("/{id}/analytics", response_model=GroupAnalytics)
+@group_router.get("/{id}/analytics", response_model=GroupAnalytics)
 def get_group_analytics(
         id: int,
         start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),

@@ -5,18 +5,16 @@ from datetime import datetime, date
 import enum
 
 from app.database import get_db
-from app.services.auth_services import AuthService
+from app.services.auth_service import AuthService
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
-from app.models.category import Category  # Предполагаем, что есть модель Category
+from app.models.category import Category
 
 # Схемы Pydantic
 from pydantic import BaseModel, ConfigDict, Field
 
 
-
-
-router = APIRouter()
+transaction_router = APIRouter()
 
 
 class TransactionTypeEnum(str, enum.Enum):
@@ -183,9 +181,7 @@ transaction_crud = TransactionCRUD()
 auth_service = AuthService()
 
 
-
-
-@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@transaction_router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_transaction(
         transaction_in: TransactionCreate,
         current_user: User = Depends(auth_service.get_current_user),
@@ -207,7 +203,7 @@ def create_transaction(
     return transaction
 
 
-@router.get("/", response_model=TransactionListResponse)
+@transaction_router.get("/", response_model=TransactionListResponse)
 def get_transactions(
         skip: int = Query(0, ge=0, description="Number of records to skip"),
         limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
@@ -244,7 +240,7 @@ def get_transactions(
     )
 
 
-@router.get("/{transaction_id}", response_model=TransactionResponse)
+@transaction_router.get("/{transaction_id}", response_model=TransactionResponse)
 def get_transaction(
         transaction_id: int,
         current_user: User = Depends(auth_service.get_current_user),
@@ -270,7 +266,7 @@ def get_transaction(
     return transaction
 
 
-@router.put("/{transaction_id}", response_model=TransactionResponse)
+@transaction_router.put("/{transaction_id}", response_model=TransactionResponse)
 def update_transaction(
         transaction_id: int,
         transaction_in: TransactionUpdate,
@@ -299,7 +295,7 @@ def update_transaction(
     return transaction
 
 
-@router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+@transaction_router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transaction(
         transaction_id: int,
         current_user: User = Depends(auth_service.get_current_user),

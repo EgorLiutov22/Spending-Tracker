@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 
 import re
 
+
 class UserLogin(BaseModel):
     login: str  # Может быть email или username
     password: str
@@ -52,6 +53,6 @@ class UserLogin(BaseModel):
 class Config:
     schema_extra = {
         "example": {
-            "login": "user@example.com","password": "SecurePass123!"
+            "login": "user@example.com", "password": "SecurePass123!"
         }
     }
