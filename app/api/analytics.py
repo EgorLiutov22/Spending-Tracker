@@ -1,21 +1,22 @@
 from datetime import date
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
-from app.models.user import User
+
 from app.api.deps import get_current_user
+from app.database import get_db
+from app.models.transaction import Transaction
+from app.models.user import User
+from app.schemas.analytic_schema import AnalyticsOverview, CategorySummary, DailySummary
 from app.services.analytics import AnalyticsService
-from app.schemas.analytic_schema import AnalyticsOverview, CategorySummary, DailySummary, ExportParams
-# from app.utils.export import export_to_csv, export_to_xlsx
+from app.utils.export import get_exporter, ExportFormat
 
-from app.utils.export import get_exporter
-
-
-analytic_router = APIRouter(prefix="/analytics", tags=["analytics"])
+router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
-@analytic_router.get("/overview", response_model=AnalyticsOverview)
+@router.get("/overview", response_model=AnalyticsOverview)
 async def get_overview(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -25,7 +26,7 @@ async def get_overview(
     return await AnalyticsService.get_overview(db, current_user, start_date, end_date)
 
 
-@analytic_router.get("/by-category", response_model=List[CategorySummary])
+@router.get("/by-category", response_model=List[CategorySummary])
 async def get_by_category(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -35,7 +36,7 @@ async def get_by_category(
     return await AnalyticsService.get_by_category(db, current_user, start_date, end_date)
 
 
-@analytic_router.get("/by-date", response_model=List[DailySummary])
+@router.get("/by-date", response_model=List[DailySummary])
 async def get_by_date(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
@@ -46,13 +47,13 @@ async def get_by_date(
     return await AnalyticsService.get_by_date(db, current_user, start_date, end_date, group_by)
 
 
-@analytic_router.get("/export")
+@router.get("/export")
 async def export_transactions(
         start_date: Optional[date] = Query(None),
         end_date: Optional[date] = Query(None),
         category_id: Optional[int] = Query(None),
         group_id: Optional[int] = Query(None),
-        format: str = Query("csv", regex="^(csv|xlsx)$"),
+        format: ExportFormat = Query(ExportFormat.CSV, description="Формат экспорта"),
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
