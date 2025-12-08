@@ -13,3 +13,5 @@ setuptools
 python-jose
 passlib
 pydantic[email]
+ruff
+pytest
