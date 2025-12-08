@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.schemas.group import GroupAnalytics, CategoryBreakdown, MemberContribution
 
 
+
 class AnalyticsService:
     @staticmethod
     def get_group_analytics(
