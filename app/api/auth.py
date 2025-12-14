@@ -1,19 +1,19 @@
-# app/api/v1/endpoints/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services.auth_services import auth_service
+from app.services.auth_service import auth_service
 from app.schemas.token_schema import Token
-from app.schemas.user_schema import UserResponse
-from app.schemas.user_create import UserCreate
+from app.schemas.user_response_schema import UserResponse
+from app.schemas.user_create_schema import UserCreate
 from app.models.user import User
 
-router = APIRouter()
+
+auth_router = APIRouter()
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(
         user_in: UserCreate,
         db: Session = Depends(get_db)
@@ -30,7 +30,7 @@ def register(
         )
 
     # Create new user
-    from app.services.auth_services import auth_service
+    from app.services.auth_service import auth_service
 
     # Хэшируем пароль
     hashed_password = auth_service.pwd_context.hash(user_in.password)
@@ -51,7 +51,7 @@ def register(
     return user
 
 
-@router.post("/login", response_model=Token)
+@auth_router.post("/login", response_model=Token)
 def login(
         form_data: OAuth2PasswordRequestForm = Depends(),
         db: Session = Depends(get_db)
@@ -83,7 +83,7 @@ def login(
     }
 
 
-@router.post("/refresh-token", response_model=Token)
+@auth_router.post("/refresh-token", response_model=Token)
 def refresh_token(
         refresh_token: str,
         db: Session = Depends(get_db)
@@ -123,7 +123,7 @@ def refresh_token(
     }
 
 
-@router.post("/change-password")
+@auth_router.post("/change-password")
 def change_password(
         current_password: str,
         new_password: str,
@@ -147,7 +147,7 @@ def change_password(
     return {"message": "Password changed successfully"}
 
 
-@router.get("/me", response_model=UserResponse)
+@auth_router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(auth_service.get_current_user)):
     """
     Get current user information
@@ -155,7 +155,7 @@ def get_me(current_user: User = Depends(auth_service.get_current_user)):
     return current_user
 
 
-@router.post("/logout")
+@auth_router.post("/logout")
 def logout():
     """
     Logout user (client should discard tokens)

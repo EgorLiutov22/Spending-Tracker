@@ -1,15 +1,17 @@
 from datetime import date
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
-from app.models.user import User
-from app.api.deps import get_current_user
-from app.services.analytics import AnalyticsService
-from app.schemas.analytics import AnalyticsOverview, CategorySummary, DailySummary, ExportParams
-from app.utils.export import export_to_csv, export_to_xlsx
 
-from app.utils.export import get_exporter
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
+from app.database import get_db
+from app.models.transaction import Transaction
+from app.models.user import User
+from app.schemas.analytic_schema import AnalyticsOverview, CategorySummary, DailySummary
+from app.services.analytics import AnalyticsService
+from app.utils.export import get_exporter, ExportFormat
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -51,7 +53,7 @@ async def export_transactions(
         end_date: Optional[date] = Query(None),
         category_id: Optional[int] = Query(None),
         group_id: Optional[int] = Query(None),
-        format: str = Query("csv", regex="^(csv|xlsx)$"),
+        format: ExportFormat = Query(ExportFormat.CSV, description="Формат экспорта"),
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
