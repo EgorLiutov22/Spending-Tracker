@@ -6,7 +6,7 @@ class UserLogin(BaseModel):
     password: str
 
 
-class Config:
+class Cfig:
     schema_extra = {
         "example": {
             "login": "user@example.com","password": "SecurePass123!"
