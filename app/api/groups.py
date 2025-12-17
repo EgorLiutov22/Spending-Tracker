@@ -1,210 +1,400 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List, Optional
 from datetime import date
-from uuid import UUID
 
 from app.database import get_db
-from app.services.auth_services import AuthService
+from app.api.deps import get_current_user
+from app.models.user import User
+from app.models.group import Group, user_group_association
+from app.models.transaction import Transaction, TransactionType
 from app.schemas.group import (
     GroupCreate,
     GroupUpdate,
     GroupResponse,
     GroupWithMembers,
     GroupAnalytics,
-    MemberResponse
+    MemberResponse,
+    CategoryBreakdown,
+    MemberContribution
 )
-from app.services.analytics_service import AnalyticsService
 
-router = APIRouter()
-auth_service = AuthService()
-analytics_service = AnalyticsService()
+router = APIRouter(prefix="/groups", tags=["groups"])
 
-# Имитация "базы данных" в памяти (для демонстрации без CRUD)
-_FAKE_GROUPS = {
-    1: {
-        "id": 1,
-        "name": "Test Group",
-        "description": "Test description",
-        "owner_id": UUID("12345678-1234-1234-1234-123456789abc")
-    },
-    2: {
-        "id": 2,
-        "name": "Family Budget",
-        "description": "Monthly family expenses",
-        "owner_id": UUID("12345678-1234-1234-1234-123456789abc")
-    }
-}
-
-_NEXT_GROUP_ID = 3
-
-
-def _get_group_by_id(group_id: int):
-    return _FAKE_GROUPS.get(group_id)
-
-
-def _get_groups_by_user(user_id: UUID):
-    return [g for g in _FAKE_GROUPS.values() if g["owner_id"] == user_id]
-
-
-def _group_exists_for_user(name: str, user_id: UUID):
-    return any(g["name"] == name and g["owner_id"] == user_id for g in _FAKE_GROUPS.values())
-
-
-def _create_group(group_in: GroupCreate, owner_id: UUID):
-    global _NEXT_GROUP_ID
-    new_group = {
-        "id": _NEXT_GROUP_ID,
-        "name": group_in.name,
-        "description": group_in.description,
-        "owner_id": owner_id
-    }
-    _FAKE_GROUPS[_NEXT_GROUP_ID] = new_group
-    _NEXT_GROUP_ID += 1
-    return new_group
-
-
-def _update_group(group_id: int, group_in: GroupUpdate):
-    if group_id not in _FAKE_GROUPS:
-        return None
-    _FAKE_GROUPS[group_id]["name"] = group_in.name
-    _FAKE_GROUPS[group_id]["description"] = group_in.description
-    return _FAKE_GROUPS[group_id]
-
-
-def _delete_group(group_id: int):
-    if group_id in _FAKE_GROUPS:
-        del _FAKE_GROUPS[group_id]
-        return True
-    return False
-
-
-def _check_user_access(group_id: int, user_id: UUID):
-    group = _get_group_by_id(group_id)
-    if group and (group["owner_id"] == user_id or group_id == 1):  # упрощённый доступ
-        return group
-    return None
-
-
-# === Роуты ===
 
 @router.post("/", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)
-def create_group(
+async def create_group(
     group_in: GroupCreate,
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)  # остаётся для совместимости, хотя не используется
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    if _group_exists_for_user(group_in.name, current_user.uid):
+    """Создать новую группу"""
+    # Проверяем, существует ли группа с таким названием у пользователя
+    stmt = select(Group).where(
+        Group.name == group_in.name,
+        Group.owner_id == current_user.id
+    )
+    result = await db.execute(stmt)
+    existing_group = result.scalar_one_or_none()
+    
+    if existing_group:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Group with this name already exists"
         )
-
-    group = _create_group(group_in, current_user.uid)
-    return GroupResponse(**group)
+    
+    # Создаем группу
+    group = Group(
+        name=group_in.name,
+        description=group_in.description,
+        owner_id=current_user.id
+    )
+    
+    db.add(group)
+    await db.commit()
+    await db.refresh(group)
+    
+    return group
 
 
 @router.get("/", response_model=List[GroupResponse])
-def get_groups(
+async def get_groups(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    all_groups = _get_groups_by_user(current_user.uid)
-    sliced = all_groups[skip : skip + limit]
-    return [GroupResponse(**g) for g in sliced]
+    """Получить список групп пользователя"""
+    stmt = select(Group).where(
+        Group.owner_id == current_user.id
+    ).offset(skip).limit(limit)
+    
+    result = await db.execute(stmt)
+    groups = result.scalars().all()
+    
+    return groups
 
 
-@router.get("/{id}", response_model=GroupWithMembers)
-def get_group(
-    id: int,
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+@router.get("/{group_id}", response_model=GroupWithMembers)
+async def get_group(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    group = _check_user_access(id, current_user.uid)
+    """Получить информацию о группе"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Group not found or access denied"
+            detail="Group not found"
         )
-
+    
+    # Проверяем, является ли пользователь владельцем или участником
+    if group.owner_id != current_user.id and current_user not in group.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Получаем список участников
     members = [
         MemberResponse(
-            user_id=current_user.uid,
-            first_name=current_user.first_name,
-            last_name=current_user.last_name
+            user_id=member.id,
+            first_name=member.first_name,
+            last_name=member.last_name
         )
+        for member in group.members
     ]
-
+    
     return GroupWithMembers(
-        id=group["id"],
-        name=group["name"],
-        description=group["description"],
-        owner_id=group["owner_id"],
+        id=group.id,
+        name=group.name,
+        description=group.description,
+        owner_id=group.owner_id,
         members=members
     )
 
 
-@router.put("/{id}", response_model=GroupResponse)
-def update_group(
-    id: int,
+@router.put("/{group_id}", response_model=GroupResponse)
+async def update_group(
+    group_id: int,
     group_in: GroupUpdate,
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    group = _get_group_by_id(id)
+    """Обновить информацию о группе"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
     if not group:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
-    if group["owner_id"] != current_user.uid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found"
+        )
+    
+    if group.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only group owner can update the group"
         )
+    
+    # Обновляем поля
+    update_data = group_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(group, field, value)
+    
+    await db.commit()
+    await db.refresh(group)
+    
+    return group
 
-    updated = _update_group(id, group_in)
-    return GroupResponse(**updated)
 
-
-@router.delete("/{id}")
-def delete_group(
-    id: int,
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+@router.delete("/{group_id}", status_code=status.HTTP_200_OK)
+async def delete_group(
+    group_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    group = _get_group_by_id(id)
+    """Удалить группу"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
     if not group:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
-    if group["owner_id"] != current_user.uid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found"
+        )
+    
+    if group.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only group owner can delete the group"
         )
+    
+    await db.delete(group)
+    await db.commit()
+    
+    return {"message": "Group deleted successfully", "group_id": group_id}
 
-    _delete_group(id)
-    return {"message": "Group deleted successfully", "group_id": id}
 
-
-@router.get("/{id}/analytics", response_model=GroupAnalytics)
-def get_group_analytics(
-    id: int,
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    category: Optional[str] = Query(None),
-    current_user=Depends(auth_service.get_current_user),
-    db: Session = Depends(get_db)
+@router.post("/{group_id}/members/{user_id}", status_code=status.HTTP_200_OK)
+async def add_member_to_group(
+    group_id: int,
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    group = _check_user_access(id, current_user.uid)
+    """Добавить участника в группу"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Group not found or access denied"
+            detail="Group not found"
         )
+    
+    if group.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only group owner can add members"
+        )
+    
+    # Получаем пользователя для добавления
+    user_stmt = select(User).where(User.id == user_id)
+    user_result = await db.execute(user_stmt)
+    user_to_add = user_result.scalar_one_or_none()
+    
+    if not user_to_add:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Проверяем, не состоит ли уже пользователь в группе
+    if user_to_add in group.members:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already a member of this group"
+        )
+    
+    # Добавляем пользователя в группу
+    group.members.append(user_to_add)
+    await db.commit()
+    
+    return {"message": "Member added successfully"}
 
-    return analytics_service.get_group_analytics(
-        db=db,
-        group_id=id,
-        start_date=start_date,
-        end_date=end_date,
-        category=category
+
+@router.delete("/{group_id}/members/{user_id}", status_code=status.HTTP_200_OK)
+async def remove_member_from_group(
+    group_id: int,
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Удалить участника из группы"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found"
+        )
+    
+    if group.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only group owner can remove members"
+        )
+    
+    # Получаем пользователя для удаления
+    user_stmt = select(User).where(User.id == user_id)
+    user_result = await db.execute(user_stmt)
+    user_to_remove = user_result.scalar_one_or_none()
+    
+    if not user_to_remove:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Проверяем, состоит ли пользователь в группе
+    if user_to_remove not in group.members:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not a member of this group"
+        )
+    
+    # Удаляем пользователя из группы
+    group.members.remove(user_to_remove)
+    await db.commit()
+    
+    return {"message": "Member removed successfully"}
+
+
+@router.get("/{group_id}/analytics", response_model=GroupAnalytics)
+async def get_group_analytics(
+    group_id: int,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    category: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Получить аналитику по группе"""
+    stmt = select(Group).where(Group.id == group_id)
+    result = await db.execute(stmt)
+    group = result.scalar_one_or_none()
+    
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group not found"
+        )
+    
+    # Проверяем доступ
+    if group.owner_id != current_user.id and current_user not in group.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Получаем транзакции группы
+    transaction_stmt = select(Transaction).where(Transaction.group_id == group_id)
+    
+    if start_date:
+        transaction_stmt = transaction_stmt.where(Transaction.date >= start_date)
+    if end_date:
+        transaction_stmt = transaction_stmt.where(Transaction.date <= end_date)
+    
+    transaction_result = await db.execute(transaction_stmt)
+    transactions = transaction_result.scalars().all()
+    
+    # Рассчитываем аналитику
+    total_income = 0.0
+    total_expenses = 0.0
+    category_totals = {}
+    member_totals = {}
+    
+    for transaction in transactions:
+        amount = float(transaction.amount)
+        
+        # Суммируем доходы и расходы
+        if transaction.type == TransactionType.INCOME:
+            total_income += amount
+        else:
+            total_expenses += amount
+        
+        # Группируем по категориям
+        if transaction.category and transaction.category.name:
+            category_name = transaction.category.name
+            if category_name not in category_totals:
+                category_totals[category_name] = 0.0
+            category_totals[category_name] += amount
+        
+        # Группируем по участникам
+        user_id = transaction.user_id
+        if user_id not in member_totals:
+            # Получаем информацию о пользователе
+            user_stmt = select(User).where(User.id == user_id)
+            user_result = await db.execute(user_stmt)
+            user = user_result.scalar_one_or_none()
+            if user:
+                member_totals[user_id] = {
+                    "user_id": user_id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "total": 0.0
+                }
+        
+        if user_id in member_totals:
+            member_totals[user_id]["total"] += amount
+    
+    # Рассчитываем проценты для категорий
+    total_amount = total_income + total_expenses
+    category_breakdown = []
+    
+    for category_name, amount in category_totals.items():
+        percentage = (amount / total_amount * 100) if total_amount > 0 else 0
+        category_breakdown.append(
+            CategoryBreakdown(
+                category=category_name,
+                amount=amount,
+                percentage=percentage
+            )
+        )
+    
+    # Рассчитываем проценты для участников
+    member_contributions = []
+    
+    for member_data in member_totals.values():
+        percentage = (member_data["total"] / total_amount * 100) if total_amount > 0 else 0
+        member_contributions.append(
+            MemberContribution(
+                user_id=member_data["user_id"],
+                first_name=member_data["first_name"],
+                last_name=member_data["last_name"],
+                total_contributed=member_data["total"],
+                percentage=percentage
+            )
+        )
+    
+    return GroupAnalytics(
+        total_expenses=total_expenses,
+        total_income=total_income,
+        balance=total_income - total_expenses,
+        member_count=len(group.members) + 1,  # +1 для владельца
+        period_start=start_date,
+        period_end=end_date,
+        category_breakdown=category_breakdown,
+        member_contributions=member_contributions
     )
