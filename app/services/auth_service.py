@@ -4,7 +4,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.database import get_db
 from app.models.user import User
@@ -73,7 +74,7 @@ class AuthService:
     async def get_current_user(
             self,
             credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
-            db: Session = Depends(get_db)
+            db: AsyncSession = Depends(get_db)
     ) -> User:
         """
         Dependency to get current user from JWT token
@@ -106,7 +107,11 @@ class AuthService:
         if email is None or token_type != "access":
             raise credentials_exception
 
-        user = db.query(User).filter(User.email == email).first()
+        # Асинхронный запрос к базе данных
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
         if user is None:
             raise credentials_exception
 
@@ -118,5 +123,95 @@ class AuthService:
 
         return user
 
+    async def authenticate_user(self, email: str, password: str, db: AsyncSession) -> Optional[User]:
+        """
+        Authenticate user by email and password
 
+        Args:
+            email: User email
+            password: User password
+            db: Database session
+
+        Returns:
+            User object if authentication successful, None otherwise
+        """
+        # Асинхронный запрос к базе данных
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return None
+        
+        if not self.pwd_context.verify(password, user.hashed_password):
+            return None
+        
+        return user
+
+    def create_refresh_token(self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+        """
+        Create JWT refresh token
+
+        Args:
+            data: Data to encode in the token
+            expires_delta: Optional expiration time delta
+
+        Returns:
+            Encoded JWT refresh token
+        """
+        to_encode = data.copy()
+
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(days=7)  # 7 дней для refresh token
+
+        to_encode.update({
+            "exp": expire,
+            "type": "refresh",
+            "iat": datetime.utcnow()
+        })
+
+        encoded_jwt = jwt.encode(
+            to_encode,
+            self.secret_key,
+            algorithm=self.algorithm
+        )
+        return encoded_jwt
+
+    async def refresh_access_token(self, refresh_token: str, db: AsyncSession) -> Optional[str]:
+        """
+        Refresh access token using refresh token
+
+        Args:
+            refresh_token: JWT refresh token
+            db: Database session
+
+        Returns:
+            New access token if refresh token is valid, None otherwise
+        """
+        payload = self.verify_token(refresh_token)
+        if payload is None:
+            return None
+
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+
+        if email is None or token_type != "refresh":
+            return None
+
+        # Проверяем существование пользователя
+        stmt = select(User).where(User.email == email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user is None or not user.is_active:
+            return None
+
+        # Создаем новый access token
+        new_access_token = self.create_access_token(data={"sub": user.email})
+        return new_access_token
+
+
+# Создаем глобальный экземпляр сервиса
 auth_service = AuthService()

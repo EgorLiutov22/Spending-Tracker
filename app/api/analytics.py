@@ -23,6 +23,7 @@ async def get_overview(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
+    """Получить обзор аналитики"""
     return await AnalyticsService.get_overview(db, current_user, start_date, end_date)
 
 
@@ -33,6 +34,7 @@ async def get_by_category(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
+    """Получить аналитику по категориям"""
     return await AnalyticsService.get_by_category(db, current_user, start_date, end_date)
 
 
@@ -44,6 +46,7 @@ async def get_by_date(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
+    """Получить аналитику по датам"""
     return await AnalyticsService.get_by_date(db, current_user, start_date, end_date, group_by)
 
 
@@ -57,14 +60,17 @@ async def export_transactions(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-
+    """Экспорт транзакций"""
     stmt = select(Transaction).where(Transaction.user_id == current_user.id)
+    
     if start_date:
         stmt = stmt.where(Transaction.date >= start_date)
     if end_date:
         stmt = stmt.where(Transaction.date <= end_date)
     if category_id:
         stmt = stmt.where(Transaction.category_id == category_id)
+    if group_id:
+        stmt = stmt.where(Transaction.group_id == group_id)
 
     result = await db.execute(stmt)
     transactions = result.scalars().all()
