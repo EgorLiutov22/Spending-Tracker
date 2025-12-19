@@ -19,13 +19,13 @@ class GroupUpdate(GroupBase):
 
 class GroupResponse(GroupBase):
     id: int
-    owner_id: UUID
+    owner_id: int
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class MemberResponse(BaseModel):
-    user_id: UUID
+    user_id: int
     first_name: str
     last_name: str
 
@@ -43,7 +43,7 @@ class CategoryBreakdown(BaseModel):
 
 
 class MemberContribution(BaseModel):
-    user_id: UUID
+    user_id: int
     first_name: str
     last_name: str
     total_contributed: float
