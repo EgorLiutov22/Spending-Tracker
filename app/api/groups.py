@@ -98,9 +98,17 @@ async def get_group(
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Group not found or access denied"
+            detail="Group not found"
         )
-
+    
+    # Проверяем, является ли пользователь владельцем или участником
+    if group.owner_id != current_user.id and current_user not in group.members:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Получаем список участников
     members = [
         MemberResponse(
             user_id=m.id,
@@ -109,7 +117,7 @@ async def get_group(
         )
         for m in group.members
     ]
-
+    
     return GroupWithMembers(
         id=group.id,
         name=group.name,
@@ -183,7 +191,7 @@ async def get_group_analytics(
     if not group:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Group not found or access denied"
+            detail="Group not found"
         )
 
     return await AnalyticsService.get_group_analytics(

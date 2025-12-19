@@ -1,20 +1,25 @@
-from .auth import auth_router as auth_router
-from .groups import group_router as groups_router
-from .transactions import transaction_router as transactions_router
-
-__all__ = ["auth_router", "groups_router", "transactions_router"]
-from .analytics import analytic_router as analytics_router
-from .categories import category_router as categories_router
-from .groups import group_router as groups_router
-from .transactions import transaction_router as transactions_router
+from .auth import auth_router
+from .analytics import router as analytics_router
+from .categories import category_router
+from .groups import router as group_router
+from .transactions import transaction_router
 from .users import router as users_router
 
+__all__ = [
+    "auth_router",
+    "analytics_router",
+    "category_router",
+    "group_router",
+    "transaction_router",
+    "users_router",
+]
 
+# Список роутеров (для обратной совместимости)
 routers = [
     auth_router,
     analytics_router,
-    categories_router,
-    groups_router,
-    transactions_router,
+    category_router,
+    group_router,
+    transaction_router,
     users_router,
 ]

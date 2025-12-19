@@ -2,9 +2,11 @@ from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, C
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum as SQLEnum
+from typing import Dict, Any
 
 from app.database import Base
 from app.models.enums import TransactionType
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -29,3 +31,48 @@ class Transaction(Base):
     
     def __repr__(self):
         return f"<Transaction(id={self.id}, name='{self.name}', amount={self.amount}, type='{self.type.value}')>"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Преобразует объект транзакции в словарь для экспорта.
+        
+        Returns:
+            Словарь с данными транзакции
+        """
+        result = {
+            'id': self.id,
+            'name': self.name,
+            'type': self.type.value,
+            'amount': float(self.amount) if self.amount else 0.0,
+            'date': self.date.isoformat() if self.date else None,
+            'category_id': self.category_id,
+            'user_id': self.user_id,
+            'group_id': self.group_id,
+        }
+        
+        # Добавляем связанные данные, если они загружены
+        try:
+            if self.category and hasattr(self.category, 'name'):
+                result['category_name'] = self.category.name
+            else:
+                result['category_name'] = None
+        except Exception:
+            result['category_name'] = None
+            
+        try:
+            if self.group and hasattr(self.group, 'name'):
+                result['group_name'] = self.group.name
+            else:
+                result['group_name'] = None
+        except Exception:
+            result['group_name'] = None
+            
+        try:
+            if self.user and hasattr(self.user, 'email'):
+                result['user_email'] = self.user.email
+            else:
+                result['user_email'] = None
+        except Exception:
+            result['user_email'] = None
+            
+        return result
